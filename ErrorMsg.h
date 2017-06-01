@@ -1,14 +1,15 @@
 #ifndef __ERROR_MSG_H__
 #define __ERROR_MSG_H__
 
-typedef struct _lineList * lineList;
-struct _lineList {
-    int pos;
-    lineList next;
-};
+#include "util.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdarg.h>
 
-void em_newline(int pos);
-void em_error(int pos, string msg);
-void em_reset(string fname);
+extern bool em_anyerrors;
+extern int em_tokPos;
 
+void em_newline(void);
+void em_error(int pos, char *msg, ...);
+void em_reset(char *file);
 #endif

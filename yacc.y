@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "errmsg.h"
+#include "ErrorMsg.h"
 #include "symbol.h"
 #include "util.h"
 #include "ast.h"
@@ -28,13 +28,12 @@ void yyerror(char *msg);
     ast_expr expr;
     ast_type type;
     ast_var var;
-    ast_func func;
+    ast_funcdecl func;
 }
 
 %{
 static void print_token_value(FILE *fp, int type, YYSTYPE value);
 #define YYPRINT(fp, type, value) print_token_value(fp,type,value);
-
 #define DECLSLIST_ADD(target,prev,elem) \
 	do \
 	{ \
@@ -42,30 +41,30 @@ static void print_token_value(FILE *fp, int type, YYSTYPE value);
 		(target) = p = (prev); \
 		if (p) \
 			{ \
-				while (p->next) \
-					p = p->next; \
-				p->next = e; \
+				while (p->tail) \
+					p = p->tail; \
+				p->tail = e; \
 			} \
 			else \
 				(target) = e; \
 	} \
-	while (false)
+	while (FALSE)
 
 #define TYPEDECLS_ADD(target,prev,elem) \
 	do \
 	{ \
-		ast_nametypeList p, e = Ast_nametypelist((elem),NULL); \
+		ast_nametypeList p, e = Ast_nameTypelist((elem),NULL); \
 		(target) = p = (prev); \
 		if (p) \
 			{ \
-				while (p->next) \
-					p = p->next; \
-				p->next = e; \
+				while (p->tail) \
+					p = p->tail; \
+				p->tail = e; \
 			} \
 			else \
 				(target) = e; \
 	} \
-	while (false)
+	while (FALSE)
 
 #define FUNCDECLS_ADD(target,prev,elem) \
 	do \
@@ -74,14 +73,14 @@ static void print_token_value(FILE *fp, int type, YYSTYPE value);
 		(target) = p = (prev); \
 		if (p) \
 			{ \
-				while (p->next) \
-					p = p->next; \
-				p->next = e; \
+				while (p->tail) \
+					p = p->tail; \
+				p->tail = e; \
 			} \
 			else \
 				(target) = e; \
 	} \
-	while (false)
+	while (FALSE)
 
 #define EXPRLIST_ADD(target,prev,elem) \
 	do \
@@ -90,14 +89,14 @@ static void print_token_value(FILE *fp, int type, YYSTYPE value);
 		(target) = p = (prev); \
 		if (p) \
 			{ \
-				while (p->next) \
-					p = p->next; \
-				p->next = e; \
+				while (p->tail) \
+					p = p->tail; \
+				p->tail = e; \
 			} \
 			else \
 				(target) = e; \
 	} \
-	while (false)
+	while (FALSE)
 
 #define EFIELDLIST_ADD(target,prev,elem) \
 	do \
@@ -106,14 +105,14 @@ static void print_token_value(FILE *fp, int type, YYSTYPE value);
 		(target) = p = (prev); \
 		if (p) \
 			{ \
-				while (p->next) \
-					p = p->next; \
-				p->next = e; \
+				while (p->tail) \
+					p = p->tail; \
+				p->tail = e; \
 			} \
 			else \
 				(target) = e; \
 	} \
-	while (false)
+	while (FALSE)
 
 #define FIELDLIST_ADD(target,prev,elem) \
 	do \
@@ -122,14 +121,14 @@ static void print_token_value(FILE *fp, int type, YYSTYPE value);
 		(target) = p = (prev); \
 		if (p) \
 			{ \
-				while (p->next) \
-					p = p->next; \
-				p->next = e; \
+				while (p->tail) \
+					p = p->tail; \
+				p->tail = e; \
 			} \
 			else \
 				(target) = e; \
 	} \
-	while (false)
+	while (FALSE)
 
 #define LVALUE_ACT(target, prev, elem) \
 		do \
@@ -145,7 +144,7 @@ static void print_token_value(FILE *fp, int type, YYSTYPE value);
 		else \
 			(target) = var; \
 	} \
-	while (false)
+	while (FALSE)
 static ast_expr _program;
 
 %}
@@ -192,11 +191,11 @@ static ast_expr _program;
 %type <expr> program expr
 %type <type> type
 %type <var> lvalue lvalue_
-%type <declList> decls type_decls
+%type <declList> decls
 %type <exprList> expr_list args_list
 %type <funcdeclList> func_decls
 %type <nametypeList> type_decls
-%type <fieldList> field_list
+%type <fieldList> field_list fields
 %type <efieldList> efield_list
 %type <func> func_decl
 %type <sym> id
@@ -221,11 +220,11 @@ expr:
 |	TK_LPARAN expr TK_RPARAN
 	{ $$ = $2; }
 |	TK_INT
-	{ $$ = Ast_intexpr(tokPos, $1); }
+	{ $$ = Ast_intexpr(em_tokPos, $1); }
 |	TK_STRING
-	{ $$ = Ast_stringexpr(tokPos, $1); }
+	{ $$ = Ast_stringexpr(em_tokPos, $1); }
 |	TK_MINUS expr TK_UMINUS					//TK_MINUS expr %prec TK_UMINUS
-	{ $$ = Ast_opexpr($1, Ast_intexpr($1,0), AST_MINUS, $2); }
+	{ $$ = Ast_opexpr($1, AST_MINUS, Ast_intexpr($1,0), $2); }
 |	id TK_LPARAN TK_RPARAN
 	{ $$ = Ast_callexpr($2, $1, NULL); }
 |	id TK_LPARAN expr args_list TK_RPARAN
@@ -264,7 +263,7 @@ expr:
 	{ $$ = Ast_assignexpr($2, $1, $3); }
 |	TK_IF expr TK_THEN expr
 	{ $$ = Ast_ifexpr($1, $2, $4, NULL); }
-|	TK_IF expr TH_THEN expr TK_ELSE expr
+|	TK_IF expr TK_THEN expr TK_ELSE expr
 	{ $$ = Ast_ifexpr($1, $2, $4, $6); }
 |	TK_WHILE expr TK_DO expr
 	{ $$ = Ast_whileexpr($1, $2, $4); }
@@ -286,17 +285,17 @@ decl:
 	{ $$ = Ast_typedecl(((ast_type) $1->head)->pos, $1); }
 |	var_decl
 |	func_decls
-	{ $$ = Ast_functiondecl(((ast_func) $1->head)->pos, $1); }
+	{ $$ = Ast_functiondecl(((ast_funcdecl) $1->head)->pos, $1); }
 
 type_decls:
 	TK_TYPE id TK_EQ type
-	{ $$ = Ast_nametypelist(Ast_nametype($2, $4), NULL); }
+	{ $$ = Ast_nameTypelist(Ast_nameType($2, $4), NULL); }
 |	type_decls TK_TYPE id TK_EQ type
-	{ TYPEDECLS_ADD($$, $1, Ast_nametype($3, $5)); }
+	{ TYPEDECLS_ADD($$, $1, Ast_nameType($3, $5)); }
 
 type:
 	id
-	{ $$ = Ast_nametype(tokPos, $1); }
+	{ $$ = Ast_nametype(em_tokPos, $1); }
 |	TK_LBRACE fields TK_RBRACE
 	{ $$ = Ast_recordtype($1, $2); }
 |	TK_ARRAY TK_OF id
@@ -330,7 +329,7 @@ expr_list:
 	TK_SEMICOLON expr
 	{ $$ = Ast_exprlist($2, NULL); }
 |
-	expr_seq TK_SEMICOLON expr
+	expr_list TK_SEMICOLON expr
 	{ EXPRLIST_ADD($$, $1, $3); }
 
 args_list:
@@ -353,7 +352,7 @@ field_list:
 
 lvalue:
 	id lvalue_
-	{ LVALUE_ACT($$, $2, Ast_simplevar(tokPos, $1)); }
+	{ LVALUE_ACT($$, $2, Ast_simplevar(em_tokPos, $1)); }
 
 lvalue_:
 	/*Nothing*/
@@ -365,12 +364,12 @@ lvalue_:
 
 id:
 	TK_ID
-	{ $$ = symbol($1); }
+	{ $$ = S_Symbol($1); }
 %%
 
 void yyerror(char *msg)
 {
-	em_error(tokPos, "%s",msg);
+	em_error(em_tokPos, "%s",msg);
 }
 
 static void print_token_value(FILE *fp, int type, YYSTYPE value)
@@ -387,7 +386,7 @@ static void print_token_value(FILE *fp, int type, YYSTYPE value)
     }
 }
 
-ast_expr_t parse(string_t filename)
+ast_expr parse(string filename)
 {
     em_reset(filename);
     if (yyparse() == 0)

@@ -1,50 +1,52 @@
 #include "ErrorMsg.h"
-#include "util.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdarg.h>
 
-extern FILE * yyin;
-static string file_name = "";
-static int line_num = 1;
-static lineList line_lst = NULL;
+bool anyErrors = FALSE;
+static string fileName = "";
+static int lineNum = 1;
+int em_tokPos = 0;
+extern FILE *yyin;
+typedef struct intList {int i;struct intList *reset;} *IntList;
 
-
-void em_newline(int pos) {
-    line_num++;
-    lineList newline = checked_malloc(sizeof(struct _lineList));
-    newline->pos = pos;
-    newline->next = line_lst;
-    line_lst = newline;
+static IntList intList(int i, IntList reset){
+	IntList l = checked_malloc(sizeof *l);
+	l->i = i; l->reset = reset;
+	return l;
 }
 
-void em_error(int pos, string msg) {
-    int n = line_num;
-    lineList p = line_lst;
+static IntList linePos = NULL;
 
-    while (p != NULL && p->pos >= pos) {
-        p = p->next;
-        n--;
-    }
-    
-    if (fileName)
-        fprintf(stderr,"%s:",file_name);
-
-    if (lines) 
-        fprintf(stderr,"%d.%d: ", n, pos - p->pos);
-    
-    fprintf(stderr, "%s\n", msg);
+void em_newline(void){
+	lineNum++;
+	linePos = intList(em_tokPos, linePos);
 }
 
-void em_reset(string fname) {
-    file_name = fname;
-    line_num = 1;
-    line_lst = checked_malloc(sizeof(struct _lineList));
-    line_lst->pos = 0; line_lst->next = NULL;
+void em_error(int pos, char *msg, ...){
+	va_list ap;
+	IntList lines = linePos;
+	int num = lineNum;
 
-    yyin = fopen(fname,"r");
-    if (!yyin) {
-        em_error(0,"cannot open");
-        exit(1);
-    }
+	anyErrors = TRUE;
+	 while (lines && lines->i >= pos)
+	 {
+	 	lines = lines->reset;
+	 	num--;
+	 }
+	 if (fileName) fprintf(stderr,"%s:",fileName);
+	 if (lines) fprintf(stderr,"%d.%d: ",num, pos - lines->i);
+	 va_start(ap,msg);
+	 vfprintf(stderr, msg, ap);
+	 va_end(ap);
+	 fprintf(stderr,"\n");
+}
+
+void em_reset(char *file){
+	anyErrors = FALSE;
+	fileName = file;
+	lineNum = 1;
+	linePos = intList(0,NULL);
+	yyin = fopen(file, "r");
+	if (!yyin) {
+		em_error(0,"cannot open");
+		exit(1);
+	}
 }

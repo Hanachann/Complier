@@ -1,73 +1,59 @@
-/***************************************************************
- * Author:          Yicong Chen
- * Email:           704434921@qq.com
- * Last modified:	2017-05-26 20:52
- * Filename:		lex.l
- * Description:     
-**************************************************************/
-
 %{
 
-#define __YY_LEX_H__
+#define YY_NO_UNISTD_H
 
 #include <ctype.h>
 #include <string.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include "Util.h"
+
+#include "ast.h"
 #include "ErrorMsg.h"
+#include "symbol.h"
+#include "y.tab.h"
+#include "util.h"
 
-extern FILE *yyin;
-
-#define ADJ \
-do{ \
-    tokPos = char_pos; \
-    char_pos += yyleng; \
-} while(0) \
-
-
+static int _char_pos = 1;
 int yywrap(void);
 
-void newline(void) {
-    em_newline(char_c);
-}
+#define ADJ \
+do \
+{ \
+	em_tokPos = yylval.pos = _char_pos; \
+	_char_pos += yyleng; \
+} \
+while (0)
 
-void err(int pos, string msg) {
-    em_error(pos, msg);    
-}
-
-typedef _strInfo * strInfo;
-struct _strInfo {
-    string buf;
-    int len;
-    int cap;
-};
-static strInfo str;
 static int _comment_level = 0;
-unsigned int char_pos = 1;
-unsigned int tokPos;
-static void str_ini(void);
-static void str_apd(char c);
+
+#define INIT_LEN 32
+static string _str_buf;
+static int _str_len;
+static int _str_cap;
+static void init_buf(void);
+static void append_char(char ch);
 
 %}
 
+%option nounput
+%option never-interactive
+
+%x COMMENT STRING 
+
 %%
-[ \t\f\v\r]             { ADJ; continue;}
-\n                      { ADJ; newline(); continue;}
+
+[ \t\f\v\r]             { ADJ; }
+\n                      { ADJ; em_newline(); }
 
 "/*"                    { ADJ; _comment_level = 1; BEGIN(COMMENT); }
-<COMMENT> {
-    [^*/\n]*            { ADJ; continue;}
-    "*"+[^*/\n]*        { ADJ; continue;}
-    "/"+[^*/\n]*        { ADJ; continue;}
-    \n                  { ADJ; newline(); continue;}
-    "/"+"*"             { ADJ; _comment_level++; continue;}
-    "*"+"/"             {
-                            ADJ;
-                            _comment_level--;
-                            if (_comment_level <= 0)
-                                BEGIN(INITIAL);
-                        }
+<COMMENT>[^*/\n]*       { ADJ; }
+<COMMENT>"*"+[^*/\n]*   { ADJ; }
+<COMMENT>"/"+[^*/\n]*   { ADJ; }
+<COMMENT>\n             { ADJ; em_newline(); }
+<COMMENT>"/"+"*"        { ADJ; _comment_level++; }
+<COMMENT>"*"+"/"        {
+    ADJ;
+    _comment_level--;
+    if (_comment_level <= 0)
+        BEGIN(INITIAL);
 }
 
 ","                     { ADJ; return TK_COMMA; }
@@ -115,60 +101,66 @@ type                    { ADJ; return TK_TYPE; }
 [0-9]+                  { ADJ; yylval.num = atoi(yytext); return TK_INT; }
 [_a-zA-Z][_a-zA-Z0-9]*  { ADJ; yylval.str = String(yytext); return TK_ID; }
 
-\"                      { ADJ; str_ini(); BEGIN(STRING); }
-<STRING> {
-    \"                  {
-                            ADJ;
-                            BEGIN(INITIAL);
-                            yylval.str = str->buf;
-                            return TK_STRING;
-                        }
-    \n                  { ADJ; newline(); continue; }
-    \\[0-9]{3}          {
-                            ADJ;
-                            int result;
-                            sscanf(yytext + 1, "%d", &result);
-                            if (result > 0xFF)
-                                err(tok_pos, "Escape String out of range");
-                            str_apd(result);
-                        }
-    \\n                 { ADJ; str_apd('\n'); continue; }
-    \\t                 { ADJ; str_apd('\t'); continue; }
-    \\\"                { ADJ; str_apd('\"'); continue; }
-    \\\\                { ADJ; str_apd('\\'); continue; }
-    \\(.|\n)            { ADJ; str_apd(yytext[1]); continue; }
-    [^\\\n\"]+          {
-                            ADJ;
-                            char *p = yytext;
-                            while (*p)
-                            str_apd(*p++);
-                        }
+\"                      { ADJ; init_buf(); BEGIN(STRING); }
+<STRING>\"              {
+    ADJ;
+    BEGIN(INITIAL);
+    yylval.str = _str_buf;
+    return TK_STRING;
+}
+<STRING>\n              { ADJ; em_newline(); }
+<STRING>\\[0-9]{3}      {
+    int result;
+
+    ADJ;
+    sscanf(yytext + 1, "%d", &result);
+    if (result > 0xFF)
+        em_error(em_tokPos, "character out of range");
+    append_char(result);
+}
+<STRING>\\n             { ADJ; append_char('\n'); }
+<STRING>\\t             { ADJ; append_char('\t'); }
+<STRING>\\\"            { ADJ; append_char('\"'); }
+<STRING>\\\\            { ADJ; append_char('\\'); }
+<STRING>\\(.|\n)        { ADJ; append_char(yytext[1]); }
+<STRING>[^\\\n\"]+      {
+    char *p = yytext;
+
+    ADJ;
+    while (*p)
+        append_char(*p++);
 }
 
-.                       { ADJ; err(tokPos, "Illegal token"); }
-
+.                       { ADJ; em_error(em_tokPos, "illegal token"); }
 
 %%
 
-int yywrap(void) {
+int yywrap(void)
+{
+    _char_pos = 1;
     return 1;
 }
 
-static void str_ini(void) {
-    str->buf = checked_malloc(32*sizeof(char));
-    str->len = 0;
-    str->cap = 32*sizeof(char);
-    str->buf[0] = '\0';
+static void init_buf(void)
+{
+    _str_buf = checked_malloc(INIT_LEN);
+    _str_buf[0] = 0;
+    _str_len = 0;
+    _str_cap = INIT_LEN;
 }
 
-static void str_apd(char c) {
-    if(++(str->len) == str->cap) {
-        str->cap *= 2;
-        string p = checked_malloc(str->cap);
-        memcpy(p, str->buf, str->len);
-        free(str->buf);
-        str->buf = p;
+static void append_char(char ch)
+{
+    if (++_str_len == _str_cap)
+    {
+        char *p;
+
+        _str_cap *= 2;
+        p = checked_malloc(_str_cap);
+        memcpy(p, _str_buf, _str_len);
+        free(_str_buf);
+        _str_buf = p;
     }
-    str->buf[str->len - 1] = c;
-    str->buf[str->len] = '\0';
+    _str_buf[_str_len - 1] = ch;
+    _str_buf[_str_len] = 0;
 }

@@ -13,7 +13,7 @@ static S_symbol mallocsym(string name, S_symbol next){
 	return s;
 }
 
-#define HASH_SIZE 109;
+#define HASH_SIZE 109
 
 static S_symbol hashtable[HASH_SIZE];
 
@@ -29,7 +29,7 @@ S_symbol S_Symbol(string name){
 	int index = hash(name) % HASH_SIZE;
 	S_symbol syms = hashtable[index],sym;
 	for (sym = syms; sym; sym = sym->next)
-		if (strcmp((string)psym->name,name) == 0) 
+		if (strcmp((string)sym->name,name) == 0) 
 			return sym;
 		sym = mallocsym(name,syms);
 		hashtable[index] = sym;
@@ -48,7 +48,7 @@ void S_enter(S_table t, S_symbol sym, void *value){
 	TAB_enter(t,sym,value);
 }
 
-void *S_look(s_table t, S_symbol sym){
+void *S_look(S_table t, S_symbol sym){
 	return TAB_look(t,sym);
 }
 

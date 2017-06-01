@@ -82,7 +82,7 @@ struct ast_type_{
 	} u;
 };
 
-struct ast_field_ { S_symbol name, type; bool escape};
+struct ast_field_ { S_symbol name, type; bool escape;};
 struct ast_efield_ { int pos; S_symbol name; ast_expr expr;};
 struct ast_funcdecl_ { int pos;
 					   S_symbol name; ast_fieldList params;
@@ -141,7 +141,9 @@ ast_funcdecl Ast_funcdecl(int pos, S_symbol name, ast_fieldList params,
 						  S_symbol result, ast_expr body);
 ast_funcdeclList Ast_funcdecllist(ast_funcdecl head, ast_funcdeclList tail);
 ast_declList Ast_decllist(ast_decl head, ast_declList tail);
-ast_nametype Ast_nametype(S_symbol name, ast_type type);
-ast_nametypeList Ast_nametypelist(ast_nametype head, ast_nametypeList tail);
+ast_nametype Ast_nameType(S_symbol name, ast_type type);
+ast_nametypeList Ast_nameTypelist(ast_nametype head, ast_nametypeList tail);
 ast_efield Ast_efield(int pos, S_symbol name, ast_expr expr);
 ast_efieldList Ast_efieldlist(ast_efield head, ast_efieldList tail);
+
+#endif

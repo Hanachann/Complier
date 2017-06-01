@@ -24,7 +24,7 @@ ast_var Ast_subscriptvar(int pos, ast_var var, ast_expr expr){
 	p->kind = AST_SubscriptVar;
 	p->pos = pos;
 	p->u.subscript.var = var;
-	p->u.subscript.expr = exp;
+	p->u.subscript.expr = expr;
 	return p;
 }
 
@@ -106,7 +106,7 @@ ast_expr Ast_ifexpr(int pos, ast_expr condition, ast_expr then, ast_expr else_){
 	p->pos = pos;
 	p->u.if_.condition = condition;
 	p->u.if_.then = then;
-	p->u.if_.else = else_;
+	p->u.if_.else_ = else_;
 	return p;
 }
 ast_expr Ast_whileexpr(int pos, ast_expr condition, ast_expr body) {
@@ -243,13 +243,13 @@ ast_declList Ast_decllist(ast_decl head, ast_declList tail) {
 	p->tail = tail;
 	return p;
 }
-ast_nametype Ast_nametype(S_symbol name, ast_type type) {
+ast_nametype Ast_nameType(S_symbol name, ast_type type) {
 	ast_nametype p = checked_malloc(sizeof(*p));
 	p->name = name;
 	p->type = type;
 	return p;
 }
-ast_nametypeList Ast_nametypelist(ast_nametype head, ast_nametypeList tail) {
+ast_nametypeList Ast_nameTypelist(ast_nametype head, ast_nametypeList tail) {
 	ast_nametypeList p = checked_malloc(sizeof(*p));
 	p->head = head;
 	p->tail = tail;
